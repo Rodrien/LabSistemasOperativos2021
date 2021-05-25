@@ -1,0 +1,200 @@
+Laboratorio de sistemas operativos 2021 - Letra A 
+
+program laboratorio is
+ 
+task admin is
+    Begin
+    entry ingresaAuto(in esManual: bool, out numero_caja: int);
+		entry ingresaAmbulancia(out: numero_caja: int);   
+    entry saleVehiculo(in numero_caja: int);
+	end admin;
+  task body admin is
+  	cajas_autos: Array (1..8) of int //las primeras 5 tienen solo telepeaje (1 a 5)
+    int menor_cant_autos;
+    int numero_caja;
+  begin
+  	for int i = 1 to 8 do
+    	cajas_autos[i] = 0;
+    end for
+  	loop
+    	select
+      	when ingresaAmbuancia'count = 0
+      		accept ingresaAuto(in esManual: bool, out numero_caja: int) do
+            if (esManual) then
+              numero_caja = 6
+              for (int i = 7 to 8)
+                if cajas_autos[i] < caja_autos[numero_caja] then
+                  numero_caja = i;
+                end if
+              end for
+            else
+              numero_caja = 1;
+              for (int i = 2 to 8) do
+                if(cajas_autos[i] < cajas_autos[numero_caja]) then
+                  numero_caja = i;
+                end if
+              end for
+            end if
+        	end ingresaAuto;
+        cajas_autos[numero_caja]++;
+      or
+      	accept ingresaAmbulancia(out: numero_caja: int) do
+        	numero_caja = 1;
+        	for (int i = 2 to 8) do
+          	if(cajas_autos[i] < cajas_autos[numero_caja]) then
+            	numero_caja = i;
+            end if
+          end for
+        end ingresaAmbulancia;
+        cajas_autos[numero_caja]++;
+    	or 
+      	accept saleVehiculo(in numero_caja: int) do
+        	cajas_autos[numero_caja]--;
+        end saleVehiculo;
+    	end select;
+    end loop;
+  end admin;
+-------------------------------------------------------  
+task supervisorAdmin is
+  Begin
+    entry despacharSupervisor(in numero_caja: int);
+    entry vuelveSupervisor1(); //le agregamos un id al supervisor para ver cual es el que va y cual el que viene
+    entry vuelveSupervisor2();
+	end supervisorAdmin;
+  task body supervisorAdmin is
+  	superVisores: Array (1..2) of bool; //true si estan libres
+  begin
+  	superVisores[1] = true;
+    superVisores[2] = true;
+  	loop
+    	select
+      	when superVisores[1] = true or superVisores[2] = true
+          accept despacharSupervisor(in numero_caja: int) do
+						if(superVisores[1]) then
+            	superVisores[1] = false;
+            	supervisor[1].resolver(nro_caja);
+            else
+            	superVisores[2] = false;
+            	supervisor[2].resolver(nro_caja);
+            end if
+          end despacharSupervisor;
+      or
+        when superVisores[1] = false
+          accept vuelveSupervisor1() do
+                superVisores[1] = true;
+          end vuelveSupervisor1;
+      or
+        when superVisores[2] = false
+          accept vuelveSupervisor2() do
+                superVisores[2] = true;
+          end vuelveSupervisor2;
+      end select;
+    end loop;
+  end supervisorAdmin;
+-------------------------------------------------------  
+	task type caja is
+  Begin
+  	entry	pasaAuto();
+    entry pasaAmbulancia();
+    entry obtengoNumero(in id:int);
+    entry libre();
+  end caja;
+  task body caja is
+  	int id;
+    bool hayAuto;
+  begin
+  	hayAuto = false;
+    accept obtengoNumero(in id:int) do
+    	id = id;
+    end obtengoNumero
+  	loop
+    	select
+      	when pasaAmbulancia'count = 0 and hayAuto = false
+          accept pasaAuto() do
+            procesar_pago();
+            levantar_barrera();
+          end pasaAuto;
+          hayAuto = true;
+    	or
+      	when hayAuto = false
+      	accept pasaAmbulancia() do
+        	//procesar_pago();
+          levantar_barrera();
+        end pasaAmbulancia;
+        hayAuto = true;
+      or
+      	accept libre();
+        admin.saleVehiculo(id);
+        hayAuto = false;
+      or delay 30.0
+      	if (hayAuto = true) then
+      		supervisorAdmin.despacharSupervisor(id);
+          hayAuto = false;
+      	end if
+      end select;
+    end loop;
+  end caja;
+-------------------------------------------------------  
+task type auto is
+  Begin
+  end auto;
+  task body auto is
+  int numero_caja;
+  begin
+  	admin.ingresaAuto(tengo_chip(), numero_caja);
+    cajas[numero_caja].pasaAuto();
+    pasar_peaje();
+    cajas[numero_caja].libre();
+  end auto;
+ ------------------------------------------------------ 
+  task type supervisor is
+  Begin
+  	entry resolver(in nroCaja: int);
+  end supervisor;
+  task body supervisor is
+  	int id;
+  begin
+  	accept obtengoNumero(in entrada:int) do
+    	id = entrada;
+    end obtengoNumero
+  	loop
+    	accept resolver(nroCaja) do
+      	mover_vehiculo(nroCaja);
+        admin.saleVehiculo(nroCaja);
+        if(id = 1) then
+        	superVisorAdmin.vuelveSupervisor1();
+        else
+        	superVisorAdmin.vuelveSupervisor2();
+        end if
+      end resolver;
+    end loop;
+  end supervisor;
+-------------------------------------------------------  
+task type ambulancia is
+  Begin
+  end ambulancia;
+  task body ambulancia is
+  begin
+  	admin.ingresaAmbulancia(tengo_chip(), numero_caja);
+    cajas[numero_caja].pasaAmbulancia();
+    pasar_peaje();
+    cajas[numero_caja].libre();
+  end ambulancia;
+-------------------------------------------------------
+  //declaro arreglos de supervisores y cajas
+  cajas: Array (1..8) of caja;
+  supervisor: Array (1..2) of supervisor;
+  
+  //inicializamos autos y ambulancias
+  autos: Array (1..n) of auto; //n tiende a infinito
+  ambulancias: Array (1..m) of ambulancia; //m tiende a infinito
+  procedure main()
+  begin
+  	for int i = 1 to 8 do
+    	cajas[i].obtengoNumero(i);
+    end for
+    for int i = 1 to 2 do
+    	supervisor[i].obtengoNumero(i);
+    end for
+  end main;
+end laboratorio;
